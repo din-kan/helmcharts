@@ -2,7 +2,7 @@ This chart is created by referring the following document: https://docs.aws.amaz
 
 Additional FluentD Daemonsets are deployed in openshift-logging project to send logs to Amazon Cloudwatch. 
 
-The following logs groups are created by FluentD if they don't exist:
+The following logs groups are created by FluentD is they dont exist:
 ____________________________________________________________________________________________________________________________________________________________________
 |			LOG GROUP NAME				|				LOG SOURCE							   |
 |---------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
