@@ -1,2 +1,2 @@
-# helmcharts
+# Helm Charts
 Repo for Helm charts
