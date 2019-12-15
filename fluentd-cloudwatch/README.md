@@ -1,5 +1,4 @@
-Logs from FluentD to AWS CloudWatch
-===================================
+# Logs from FluentD to AWS CloudWatch
 
 The chart is created by referring the following document: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs.html with modifications required to run in Openlshift 3.11.
 
@@ -17,8 +16,10 @@ ________________________________________________________________________________
 |								|	The following IAM policy has to be applied to all the nodes/EC2 instances in Openshift.	   |
 |_______________________________________________________________|__________________________________________________________________________________________________|
 
-IAM policy to be applied on all nodes (EC2 instances) in the cluster
-===============================================================
+# Prerequisites
+
+1. Pre deployed openshift-logging project.
+2. IAM policy to be applied on all nodes (EC2 instances) in the cluster
 
 {
     "Version": "2012-10-17",
