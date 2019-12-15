@@ -1,66 +1,320 @@
 # Default values for fluentd-cloudwatch.
 # This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-replicaCount: 1
 
 image:
-  repository: nginx
-  pullPolicy: IfNotPresent
+  repository: fluent/fluentd-kubernetes-daemonset
+  tag: v1.7.3-debian-cloudwatch-1.0
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+serviceAccount: aggregated-logging-fluentd
+serviceAccountName: aggregated-logging-fluentd
 
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name:
+clusterInfo:
+  awsRegion: ap-southeast-2
+  name: oset02
 
-podSecurityContext: {}
-  # fsGroup: 2000
+configMapData:
+  fluent.conf: |
+    @include containers.conf
+    @include systemd.conf
+    @include host.conf
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+    <match fluent.**>
+      @type null
+    </match>
+  containers.conf: |
+    <source>
+      @type tail
+      @id in_tail_container_logs
+      @label @containers
+      path /var/log/containers/*.log
+      exclude_path ["/var/log/containers/cloudwatch-agent*", "/var/log/containers/fluentd*"]
+      pos_file /var/log/fluentd-containers.log.pos
+      tag *
+      read_from_head true
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
 
-service:
-  type: ClusterIP
-  port: 80
+    <source>
+      @type tail
+      @id in_tail_cwagent_logs
+      @label @cwagentlogs
+      path /var/log/containers/cloudwatch-agent*
+      pos_file /var/log/cloudwatch-agent.log.pos
+      tag *
+      read_from_head true
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
 
-ingress:
-  enabled: false
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths: []
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
+    <source>
+      @type tail
+      @id in_tail_fluentd_logs
+      @label @fluentdlogs
+      path /var/log/containers/fluentd*
+      pos_file /var/log/fluentd.log.pos
+      tag *
+      read_from_head true
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
 
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+    <label @fluentdlogs>
+      <filter **>
+        @type kubernetes_metadata
+        @id filter_kube_metadata_fluentd
+      </filter>
 
-nodeSelector: {}
+      <filter **>
+        @type record_transformer
+        @id filter_fluentd_stream_transformer
+        <record>
+          stream_name ${tag_parts[3]}
+        </record>
+      </filter>
 
-tolerations: []
+      <match **>
+        @type relabel
+        @label @NORMAL
+      </match>
+    </label>
 
-affinity: {}
+    <label @containers>
+      <filter **>
+        @type kubernetes_metadata
+        @id filter_kube_metadata
+      </filter>
+
+      <filter **>
+        @type record_transformer
+        @id filter_containers_stream_transformer
+        <record>
+          stream_name ${tag_parts[3]}
+        </record>
+      </filter>
+
+      <filter **>
+        @type concat
+        key log
+        multiline_start_regexp /^\S/
+        separator ""
+        flush_interval 5
+        timeout_label @NORMAL
+      </filter>
+
+      <match **>
+        @type relabel
+        @label @NORMAL
+      </match>
+    </label>
+
+    <label @cwagentlogs>
+      <filter **>
+        @type kubernetes_metadata
+        @id filter_kube_metadata_cwagent
+      </filter>
+
+      <filter **>
+        @type record_transformer
+        @id filter_cwagent_stream_transformer
+        <record>
+          stream_name ${tag_parts[3]}
+        </record>
+      </filter>
+
+      <filter **>
+        @type concat
+        key log
+        multiline_start_regexp /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/
+        separator ""
+        flush_interval 5
+        timeout_label @NORMAL
+      </filter>
+
+      <match **>
+        @type relabel
+        @label @NORMAL
+      </match>
+    </label>
+
+    <label @NORMAL>
+      <match **>
+        @type cloudwatch_logs
+        @id out_cloudwatch_logs_containers
+        region "#{ENV.fetch('REGION')}"
+        log_group_name "/aws/containerinsights/#{ENV.fetch('CLUSTER_NAME')}/application"
+        log_stream_name_key stream_name
+        remove_log_stream_name_key true
+        auto_create_stream true
+        <buffer>
+          flush_interval 5
+          chunk_limit_size 2m
+          queued_chunks_limit_size 32
+          retry_forever true
+        </buffer>
+      </match>
+    </label>
+  systemd.conf: |
+    <source>
+      @type systemd
+      @id in_systemd_kubelet
+      @label @systemd
+      filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
+      <entry>
+        field_map {"MESSAGE": "message", "_HOSTNAME": "hostname", "_SYSTEMD_UNIT": "systemd_unit"}
+        field_map_strict true
+      </entry>
+      path /var/log/journal
+      <storage>
+        @type local
+        persistent true
+        path /var/log/fluentd-journald-kubelet-pos.json
+      </storage>
+      read_from_head true
+      tag kubelet.service
+    </source>
+
+    <source>
+      @type systemd
+      @id in_systemd_kubeproxy
+      @label @systemd
+      filters [{ "_SYSTEMD_UNIT": "kubeproxy.service" }]
+      <entry>
+        field_map {"MESSAGE": "message", "_HOSTNAME": "hostname", "_SYSTEMD_UNIT": "systemd_unit"}
+        field_map_strict true
+      </entry>
+      path /var/log/journal
+      <storage>
+        @type local
+        persistent true
+        path /var/log/fluentd-journald-kubeproxy-pos.json
+      </storage>
+      read_from_head true
+      tag kubeproxy.service
+    </source>
+
+    <source>
+      @type systemd
+      @id in_systemd_docker
+      @label @systemd
+      filters [{ "_SYSTEMD_UNIT": "docker.service" }]
+      <entry>
+        field_map {"MESSAGE": "message", "_HOSTNAME": "hostname", "_SYSTEMD_UNIT": "systemd_unit"}
+        field_map_strict true
+      </entry>
+      path /var/log/journal
+      <storage>
+        @type local
+        persistent true
+        path /var/log/fluentd-journald-docker-pos.json
+      </storage>
+      read_from_head true
+      tag docker.service
+    </source>
+
+    <label @systemd>
+      <filter **>
+        @type kubernetes_metadata
+        @id filter_kube_metadata_systemd
+      </filter>
+
+      <filter **>
+        @type record_transformer
+        @id filter_systemd_stream_transformer
+        <record>
+          stream_name ${tag}-${record["hostname"]}
+        </record>
+      </filter>
+
+      <match **>
+        @type cloudwatch_logs
+        @id out_cloudwatch_logs_systemd
+        region "#{ENV.fetch('REGION')}"
+        log_group_name "/aws/containerinsights/#{ENV.fetch('CLUSTER_NAME')}/dataplane"
+        log_stream_name_key stream_name
+        auto_create_stream true
+        remove_log_stream_name_key true
+        <buffer>
+          flush_interval 5
+          chunk_limit_size 2m
+          queued_chunks_limit_size 32
+          retry_forever true
+        </buffer>
+      </match>
+    </label>
+  host.conf: |
+    <source>
+      @type tail
+      @id in_tail_dmesg
+      @label @hostlogs
+      path /var/log/dmesg
+      pos_file /var/log/dmesg.log.pos
+      tag host.dmesg
+      read_from_head true
+      <parse>
+        @type syslog
+      </parse>
+    </source>
+
+    <source>
+      @type tail
+      @id in_tail_secure
+      @label @hostlogs
+      path /var/log/secure
+      pos_file /var/log/secure.log.pos
+      tag host.secure
+      read_from_head true
+      <parse>
+        @type syslog
+      </parse>
+    </source>
+
+    <source>
+      @type tail
+      @id in_tail_messages
+      @label @hostlogs
+      path /var/log/messages
+      pos_file /var/log/messages.log.pos
+      tag host.messages
+      read_from_head true
+      <parse>
+        @type syslog
+      </parse>
+    </source>
+
+    <label @hostlogs>
+      <filter **>
+        @type kubernetes_metadata
+        @id filter_kube_metadata_host
+      </filter>
+
+      <filter **>
+        @type record_transformer
+        @id filter_containers_stream_transformer_host
+        <record>
+          stream_name ${tag}-${record["host"]}
+        </record>
+      </filter>
+
+      <match host.**>
+        @type cloudwatch_logs
+        @id out_cloudwatch_logs_host_logs
+        region "#{ENV.fetch('REGION')}"
+        log_group_name "/aws/containerinsights/#{ENV.fetch('CLUSTER_NAME')}/host"
+        log_stream_name_key stream_name
+        remove_log_stream_name_key true
+        auto_create_stream true
+        <buffer>
+          flush_interval 5
+          chunk_limit_size 2m
+          queued_chunks_limit_size 32
+          retry_forever true
+        </buffer>
+      </match>
+    </label>

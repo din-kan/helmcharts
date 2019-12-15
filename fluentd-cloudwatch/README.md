@@ -1,8 +1,11 @@
-This chart is created by referring the following document: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs.html with modifications required to run in Openlshift 3.11.
+Logs from FluentD to AWS CloudWatch
+===================================
+
+The chart is created by referring the following document: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs.html with modifications required to run in Openlshift 3.11.
 
 Additional FluentD Daemonsets are deployed in openshift-logging project to send logs to Amazon Cloudwatch. 
 
-The following logs groups are created by FluentD is they dont exist:
+The following logs groups are created by FluentD if they dont exist:
 ____________________________________________________________________________________________________________________________________________________________________
 |			LOG GROUP NAME				|				LOG SOURCE							   |
 |---------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
@@ -14,7 +17,9 @@ ________________________________________________________________________________
 |								|	The following IAM policy has to be applied to all the nodes/EC2 instances in Openshift.	   |
 |_______________________________________________________________|__________________________________________________________________________________________________|
 
-IAM policy required on all nodes (EC2 instances) in the cluster
+IAM policy to be applied on all nodes (EC2 instances) in the cluster
+===============================================================
+
 {
     "Version": "2012-10-17",
     "Statement": [

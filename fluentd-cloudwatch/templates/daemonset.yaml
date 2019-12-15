@@ -1,0 +1,92 @@
+piVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: fluentd-cloudwatch-{{ .Release.Name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-cloudwatch-{{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        k8s-app: fluentd-cloudwatch-{{ .Release.Name }}
+    spec:
+      nodeSelector:
+        logging: "true"
+      priorityClassName: cluster-logging
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: {{ .Values.serviceAccountv}}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      tolerations:
+      - operator: Exists
+      terminationGracePeriodSeconds: 30
+      # Because the image's entrypoint requires to write on /fluentd/etc but we mount configmap there which is read-only,
+      # this initContainers workaround or other is needed.
+      # See https://github.com/fluent/fluentd-kubernetes-daemonset/issues/90
+      initContainers:
+        - name: copy-fluentd-config
+          image: busybox
+          command: ['sh', '-c', 'cp /config-volume/..data/* /fluentd/etc']
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config-volume
+            - name: fluentdconf
+              mountPath: /fluentd/etc
+        - name: update-log-driver
+          image: busybox
+          command: ['sh','-c','']
+      containers:
+        - name: fluentd-cloudwatch-{{ .Release.Name }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          env:
+            - name: REGION
+              value: {{ .Values.clusterInfo.awsRegion }}
+            - name: CLUSTER_NAME
+              value: {{ .Values.clusterInfo.name }}
+            - name: CI_VERSION
+              value: "k8s/1.0.1"
+          resources:
+            limits:
+              memory: 400Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config-volume
+            - name: fluentdconf
+              mountPath: /fluentd/etc
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: runlogjournal
+              mountPath: /run/log/journal
+              readOnly: true
+            - name: dmesg
+              mountPath: /var/log/dmesg
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: fluentd-config
+        - name: fluentdconf
+          emptyDir: {}
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: runlogjournal
+          hostPath:
+            path: /run/log/journal
+        - name: dmesg
+          hostPath:
+            path: /var/log/dmesg
