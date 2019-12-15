@@ -16,11 +16,11 @@ ________________________________________________________________________________
 |								|	The following IAM policy has to be applied to all the nodes/EC2 instances in Openshift.	   |
 |_______________________________________________________________|__________________________________________________________________________________________________|
 
-# Prerequisites
+## Prerequisites
 
 1. Pre deployed openshift-logging project.
 2. IAM policy to be applied on all nodes (EC2 instances) in the cluster
-
+```
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -40,3 +40,4 @@ ________________________________________________________________________________
         }
     ]
 }
+```
