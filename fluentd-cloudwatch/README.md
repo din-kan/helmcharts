@@ -7,7 +7,7 @@ Additional FluentD Daemonsets are deployed in openshift-logging project to send 
 The following logs groups are created by FluentD if they dont exist:
 
 | LOG GROUP NAME | LOG SOURCE |
-| :--- | :---: |
+| --- | --- |
 |	/aws/containerinsights/Cluster_Name/application  	|	All log files in /var/log/containers							   |
 |								|												   |
 |	/aws/containerinsights/Cluster_Name/host		|	Logs from /var/log/dmesg, /var/log/secure, and /var/log/messages			   |
