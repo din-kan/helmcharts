@@ -1,6 +1,6 @@
 # Logs from FluentD to AWS CloudWatch
 
-The chart is created by referring the [following document](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs.html) with modifications required to run in Openlshift 3.11.
+The chart is created by referring the [document](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs.html) with modifications required to run in Openshift 3.11.
 
 Additional FluentD Daemonsets are deployed in openshift-logging project to send logs to Amazon Cloudwatch. 
 
