@@ -13,7 +13,6 @@ The following logs groups are created by FluentD if they dont exist:
 |	/aws/containerinsights/Cluster_Name/host		|	Logs from /var/log/dmesg, /var/log/secure, and /var/log/messages			   |
 |								|												   |
 |	/aws/containerinsights/Cluster_Name/dataplane		|	The logs in /var/log/journal for kubelet.service, kubeproxy.service, and docker.service.   |
-|								|	The following IAM policy has to be applied to all the nodes/EC2 instances in Openshift.	   |
 
 ## Prerequisites
 
