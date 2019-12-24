@@ -2,8 +2,8 @@
 Repo for Helm charts
 
 
-# Common OpenShift object kinds and their full API groups:
-|##apiVersion |	Kind
+# Common OpenShift object kinds and their full API groups: reference[https://blog.openshift.com/getting-started-helm-openshift/]
+|apiVersion |	Kind
 | --- | --- |
 |apps.openshift.io/v1 |	DeploymentConfig
 |authorization.openshift.io/v1, rbac/v1beta1* |	ClusterRole
