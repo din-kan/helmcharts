@@ -2,7 +2,7 @@
 Repo for Helm charts
 
 
-# Common OpenShift object kinds and their full API groups: 
+## Common OpenShift object kinds and their full API groups: 
 
 |apiVersion |	Kind |
 | --- | --- |
